@@ -72,17 +72,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Update locales data
-        run: |
-          curl -H 'X-API-KEY: ${{ secrets.TOLGEE_TOKEN }}' 'https://app.tolgee.io/v2/projects/export' -o locales.zip
-          unzip -o -d ./src/locales locales.zip
-          rm locales.zip
-
-      - name: Update locales metadata
-        uses: VueTorrent/tolgee-action@main
-        with:
-          tolgee_secret: ${{ secrets.TOLGEE_TOKEN }}
-
       - name: Build VueTorrent
         run: |
           npm version --no-commit-hooks --no-git-tag-version --allow-same-version ${{ needs.setup-release.outputs.nightly_version }}
@@ -144,7 +133,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/VueTorrent/vuetorrent-lsio-mod
+          images: ghcr.io/${{ github.repository_owner }}/vuetorrent-lsio-mod
           tags: |
             type=raw,value=nightly
             type=sha
@@ -159,27 +148,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  push-demo:
-    name: Push to demo repo
-    runs-on: ubuntu-latest
-    needs: build-release
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
 
-      - uses: actions/download-artifact@v8
-        with:
-          name: vuetorrent-demo
-          path: ./vuetorrent-demo
-
-      - name: Push to demo repo
-        uses: JamesIves/github-pages-deploy-action@v4
-        with:
-          folder: './vuetorrent-demo'
-          repository-name: 'VueTorrent/demo'
-          token: ${{ secrets.GH_PAT }}
 
   upload-release:
     name: Upload release to GitHub
@@ -253,7 +222,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/VueTorrent/vuetorrent-lsio-mod
+          images: ghcr.io/${{ github.repository_owner }}/vuetorrent-lsio-mod
           tags: |
             type=match,pattern=v(.*),group=1,value=${{ needs.setup-release.outputs.tag_name }}
 
