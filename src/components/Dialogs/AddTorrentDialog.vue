@@ -92,6 +92,7 @@ function submit() {
     const baseSavePath = payload.savepath ? payload.savepath.replace(/[/\\]$/, '') : ''
     payload.savepath = baseSavePath ? `${baseSavePath}/${basename}` : basename
     payload.contentLayout = ContentLayout.NO_SUBFOLDER
+    payload.autoTMM = false
   }
 
   const torrentsCount = files.value.length + urls.value.split('\n').filter(url => url.trim().length).length
@@ -106,7 +107,8 @@ function submit() {
         ...payload,
         rename: basename,
         savepath: baseSavePath ? `${baseSavePath}/${basename}` : basename,
-        contentLayout: ContentLayout.NO_SUBFOLDER
+        contentLayout: ContentLayout.NO_SUBFOLDER,
+        autoTMM: false,
       }
       const p = torrentStore
         .addTorrents([file], '', filePayload)
