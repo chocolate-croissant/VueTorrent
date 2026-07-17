@@ -272,16 +272,11 @@ export const useTorrentStore = defineStore(
     }
 
     async function addTorrentAndRenameFolder(file: File, desiredName: string, payload: AddTorrentPayload): Promise<void> {
-      // 1. Remember if user wanted it stopped
-      const userWantsStopped = payload.stopped || payload.paused
-
-      // 2. Force stopped=true for the add
-      const addPayload: AddTorrentPayload = { ...payload, stopped: true, paused: true, rename: desiredName }
-
-      // 3. Add the torrent
+      // 1. Add the torrent with the user's intended payload (preserves their 'stopped' choice), but set display name
+      const addPayload: AddTorrentPayload = { ...payload, rename: desiredName }
       await qbit.addTorrents([file], '', addPayload)
 
-      // 4. Poll getTorrents() to find the torrent by name
+      // 2. Poll getTorrents() to find the torrent by name (since we just set its name)
       //    Retry up to ~3 seconds (6 attempts × 500ms)
       let torrent: QbitTorrent | undefined
       for (let i = 0; i < 6; i++) {
@@ -290,28 +285,34 @@ export const useTorrentStore = defineStore(
         torrent = torrents.find(t => t.name === desiredName)
         if (torrent) break
       }
+      
       if (!torrent) {
-        throw new Error(`Torrent "${desiredName}" was added but folder rename failed: could not find torrent. It may need to be manually resumed.`)
+        throw new Error(`Torrent "${desiredName}" was added but folder rename failed: could not find torrent in client.`)
       }
 
-      // 5. Determine the old folder name from content_path vs save_path
-      const savePath = torrent.save_path.replace(/[/\\]$/, '')
-      const contentPath = torrent.content_path
-      const relativePath = contentPath.startsWith(savePath) ? contentPath.slice(savePath.length + 1) : contentPath
-      const oldFolderName = relativePath.split(/[/\\]/)[0]
-
-      // 6. Rename the folder (only for multi-file torrents where folder differs)
-      if (oldFolderName && oldFolderName !== desiredName && relativePath.includes('/')) {
-        await qbit.renameFolder(torrent.hash, oldFolderName, desiredName)
-      }
-
-      // 7. Resume if user didn't want it stopped
-      if (!userWantsStopped) {
-        if (appStore.usesQbit5) {
-          await qbit.startTorrents([torrent.hash])
-        } else {
-          await qbit.resumeTorrents([torrent.hash])
+      // 3. To find the real folder name reliably, check the actual files of the torrent
+      let oldFolderName = ''
+      for (let i = 0; i < 6; i++) {
+        try {
+          const files = await qbit.getTorrentFiles(torrent.hash)
+          if (files && files.length > 0) {
+            const firstFile = files[0].name
+            // If the file path contains a slash, the first segment is the root folder
+            const separator = firstFile.includes('/') ? '/' : firstFile.includes('\\') ? '\\' : null
+            if (separator) {
+              oldFolderName = firstFile.split(separator)[0]
+            }
+            break
+          }
+        } catch (e) {
+          // Ignore error and retry if files are not yet available
         }
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+
+      // 4. Rename the folder (only if it's a multi-file torrent and the folder name differs)
+      if (oldFolderName && oldFolderName !== desiredName) {
+        await qbit.renameFolder(torrent.hash, oldFolderName, desiredName)
       }
     }
 

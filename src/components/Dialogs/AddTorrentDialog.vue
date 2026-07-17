@@ -140,8 +140,8 @@ function submit() {
   const batchPromise = Promise.allSettled(promises).then(results => {
     const failed = results.filter(r => r.status === 'rejected')
     if (failed.length > 0) {
-      if (form.value.useFilenameAsRename && files.value.length > 1) {
-        const failedNames = failed.map(r => r.reason?.fileName || 'unknown').join(', ')
+      if (form.value.useFilenameAsRename && files.value.length > 0) {
+        const failedNames = failed.map(r => (r as any).reason?.fileName || 'unknown').join(', ')
         throw new Error(`${failed.length}/${results.length} torrent(s) failed to add. Failed torrents: ${failedNames}`)
       } else {
         throw failed[0].reason instanceof Error ? failed[0].reason : new Error(String(failed[0].reason))
