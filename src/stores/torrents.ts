@@ -271,49 +271,69 @@ export const useTorrentStore = defineStore(
       return qbit.addTorrents(torrents, links, payload)
     }
 
-    async function addTorrentAndRenameFolder(file: File, desiredName: string, payload: AddTorrentPayload): Promise<void> {
-      // 1. Add the torrent with the user's intended payload (preserves their 'stopped' choice), but set display name
-      const addPayload: AddTorrentPayload = { ...payload, rename: desiredName }
-      await qbit.addTorrents([file], '', addPayload)
-
-      // 2. Poll getTorrents() to find the torrent by name (since we just set its name)
-      //    Retry up to ~3 seconds (6 attempts × 500ms)
-      let torrent: QbitTorrent | undefined
-      for (let i = 0; i < 6; i++) {
-        await new Promise(resolve => setTimeout(resolve, 500))
-        const torrents = await qbit.getTorrents()
-        torrent = torrents.find(t => t.name === desiredName)
-        if (torrent) break
-      }
+    async function addTorrentsAndRenameFolders(files: File[], getDesiredName: (f: File) => string, payload: AddTorrentPayload): Promise<void> {
+      // 1. Add all torrents concurrently. Promise.all manages sending them all.
+      const items = files.map(file => ({ file, desiredName: getDesiredName(file) }))
       
-      if (!torrent) {
-        throw new Error(`Torrent "${desiredName}" was added but folder rename failed: could not find torrent in client.`)
-      }
+      await Promise.all(items.map(item => {
+        const addPayload: AddTorrentPayload = { ...payload, rename: item.desiredName }
+        return qbit.addTorrents([item.file], '', addPayload)
+      }))
 
-      // 3. To find the real folder name reliably, check the actual files of the torrent
-      let oldFolderName = ''
+      // 2. Poll getTorrents() ONCE for all newly added torrents
+      const pendingNames = new Set(items.map(item => item.desiredName))
+      const foundTorrents: QbitTorrent[] = []
+      
       for (let i = 0; i < 6; i++) {
+        if (pendingNames.size === 0) break
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
         try {
-          const files = await qbit.getTorrentFiles(torrent.hash)
-          if (files && files.length > 0) {
-            const firstFile = files[0].name
-            // If the file path contains a slash, the first segment is the root folder
-            const separator = firstFile.includes('/') ? '/' : firstFile.includes('\\') ? '\\' : null
-            if (separator) {
-              oldFolderName = firstFile.split(separator)[0]
+          const torrents = await qbit.getTorrents()
+          for (const name of Array.from(pendingNames)) {
+            const t = torrents.find(t => t.name === name)
+            if (t) {
+              foundTorrents.push(t)
+              pendingNames.delete(name)
             }
-            break
           }
         } catch (e) {
-          // Ignore error and retry if files are not yet available
+          // ignore network errors during polling
         }
-        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+      
+      if (pendingNames.size > 0) {
+        const failedNames = Array.from(pendingNames).join(', ')
+        throw new Error(`Folder rename failed for ${pendingNames.size} torrent(s): could not find them in client. Failed: ${failedNames}`)
       }
 
-      // 4. Rename the folder (only if it's a multi-file torrent and the folder name differs)
-      if (oldFolderName && oldFolderName !== desiredName) {
-        await qbit.renameFolder(torrent.hash, oldFolderName, desiredName)
-      }
+      // 3. For each found torrent, fetch files and rename folder.
+      // This happens concurrently but is very fast since we only do it for found torrents.
+      await Promise.allSettled(foundTorrents.map(async (torrent) => {
+        const desiredName = torrent.name
+        let oldFolderName = ''
+        
+        for (let i = 0; i < 6; i++) {
+          try {
+            const tFiles = await qbit.getTorrentFiles(torrent.hash)
+            if (tFiles && tFiles.length > 0) {
+              const firstFile = tFiles[0].name
+              const separator = firstFile.includes('/') ? '/' : firstFile.includes('\\') ? '\\' : null
+              if (separator) {
+                oldFolderName = firstFile.split(separator)[0]
+              }
+              break
+            }
+          } catch (e) {
+            // Ignore error and retry if files are not yet available
+          }
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
+
+        if (oldFolderName && oldFolderName !== desiredName) {
+          await qbit.renameFolder(torrent.hash, oldFolderName, desiredName)
+        }
+      }))
     }
 
     async function reannounceTorrents(hashes: MaybeRefOrGetter<string[]>) {
@@ -419,7 +439,7 @@ export const useTorrentStore = defineStore(
       deleteTorrents,
       moveTorrents,
       addTorrents,
-      addTorrentAndRenameFolder,
+      addTorrentsAndRenameFolders,
       reannounceTorrents,
       toggleSeqDl,
       toggleFLPiecePrio,

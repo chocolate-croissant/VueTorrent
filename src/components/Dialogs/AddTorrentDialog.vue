@@ -102,21 +102,20 @@ function submit() {
   const promises: Promise<void>[] = []
 
   if (form.value.useFilenameAsRename && files.value.length > 0) {
-    for (const file of files.value) {
-      const p = torrentStore
-        .addTorrentAndRenameFolder(file, stripTorrentExtension(file.name), payload)
-        .then(() => {
-          files.value = files.value.filter(f => f.name !== file.name)
-        })
-        .catch(err => {
-          const e = new Error(err.message || String(err))
-          ;(e as any).fileName = file.name
-          return Promise.reject(e)
-        })
-      promises.push(p)
-    }
+    const p = torrentStore
+      .addTorrentsAndRenameFolders(files.value, f => stripTorrentExtension(f.name), payload)
+      .then(() => {
+        files.value = []
+      })
+      .catch(err => {
+        const e = new Error(err.message || String(err))
+        ;(e as any).fileName = 'Files'
+        return Promise.reject(e)
+      })
+    promises.push(p)
+
     if (urls.value) {
-      const p = torrentStore
+      const pUrl = torrentStore
         .addTorrents([], urls.value, payload)
         .then(() => {
           urls.value = ''
@@ -126,7 +125,7 @@ function submit() {
           ;(e as any).fileName = 'URLs'
           return Promise.reject(e)
         })
-      promises.push(p)
+      promises.push(pUrl)
     }
   } else {
     promises.push(
