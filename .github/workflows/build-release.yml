@@ -74,12 +74,14 @@ jobs:
         run: npm ci
 
       - name: Update locales data
+        if: ${{ secrets.TOLGEE_TOKEN != '' }}
         run: |
           curl -H 'X-API-KEY: ${{ secrets.TOLGEE_TOKEN }}' 'https://app.tolgee.io/v2/projects/export' -o locales.zip
           unzip -o -d ./src/locales locales.zip
           rm locales.zip
 
       - name: Update locales metadata
+        if: ${{ secrets.TOLGEE_TOKEN != '' }}
         uses: VueTorrent/tolgee-action@main
         with:
           tolgee_secret: ${{ secrets.TOLGEE_TOKEN }}
