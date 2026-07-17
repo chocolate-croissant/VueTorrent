@@ -271,6 +271,50 @@ export const useTorrentStore = defineStore(
       return qbit.addTorrents(torrents, links, payload)
     }
 
+    async function addTorrentAndRenameFolder(file: File, desiredName: string, payload: AddTorrentPayload): Promise<void> {
+      // 1. Remember if user wanted it stopped
+      const userWantsStopped = payload.stopped || payload.paused
+
+      // 2. Force stopped=true for the add
+      const addPayload: AddTorrentPayload = { ...payload, stopped: true, paused: true, rename: desiredName }
+
+      // 3. Add the torrent
+      await qbit.addTorrents([file], '', addPayload)
+
+      // 4. Poll getTorrents() to find the torrent by name
+      //    Retry up to ~3 seconds (6 attempts × 500ms)
+      let torrent: RawQbitTorrent | undefined
+      for (let i = 0; i < 6; i++) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+        const torrents = await qbit.getTorrents()
+        torrent = torrents.find(t => t.name === desiredName)
+        if (torrent) break
+      }
+      if (!torrent) {
+        throw new Error(`Torrent "${desiredName}" was added but folder rename failed: could not find torrent. It may need to be manually resumed.`)
+      }
+
+      // 5. Determine the old folder name from content_path vs save_path
+      const savePath = torrent.save_path.replace(/[/\\]$/, '')
+      const contentPath = torrent.content_path
+      const relativePath = contentPath.startsWith(savePath) ? contentPath.slice(savePath.length + 1) : contentPath
+      const oldFolderName = relativePath.split(/[/\\]/)[0]
+
+      // 6. Rename the folder (only for multi-file torrents where folder differs)
+      if (oldFolderName && oldFolderName !== desiredName && relativePath.includes('/')) {
+        await qbit.renameFolder(torrent.hash, oldFolderName, desiredName)
+      }
+
+      // 7. Resume if user didn't want it stopped
+      if (!userWantsStopped) {
+        if (appStore.usesQbit5) {
+          await qbit.startTorrents([torrent.hash])
+        } else {
+          await qbit.resumeTorrents([torrent.hash])
+        }
+      }
+    }
+
     async function reannounceTorrents(hashes: MaybeRefOrGetter<string[]>) {
       await qbit.reannounceTorrents(toValue(hashes))
     }
@@ -374,6 +418,7 @@ export const useTorrentStore = defineStore(
       deleteTorrents,
       moveTorrents,
       addTorrents,
+      addTorrentAndRenameFolder,
       reannounceTorrents,
       toggleSeqDl,
       toggleFLPiecePrio,

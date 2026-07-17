@@ -317,7 +317,8 @@
       "submit": "Add torrents",
       "title": "Add Torrents",
       "use_filename": "Use filename as torrent name",
-      "use_filename_warning": "Warning: Adding multiple torrents at once with this option enabled may cause instability if you upload a very large number of files simultaneously."
+      "use_filename_warning": "Warning: Adding multiple torrents at once with this option enabled may cause instability if you upload a very large number of files simultaneously.",
+      "use_filename_duplicate_warning": "Cannot use filename as rename when multiple files share the same name."
     },
     "bulkEditTrackers": {
       "add": "Trackers to add",

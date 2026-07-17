@@ -58,6 +58,17 @@ watch(
   { deep: true }
 )
 
+const hasDuplicateFilenames = computed(() => {
+  const basenames = files.value.map(f => stripTorrentExtension(f.name))
+  return new Set(basenames).size !== basenames.length
+})
+
+watch(hasDuplicateFilenames, hasDupes => {
+  if (hasDupes) {
+    form.value.useFilenameAsRename = false
+  }
+})
+
 function submit() {
   if (!isFormValid.value) return
 
@@ -90,11 +101,10 @@ function submit() {
 
   const promises: Promise<void>[] = []
 
-  if (form.value.useFilenameAsRename && files.value.length > 1) {
+  if (form.value.useFilenameAsRename && files.value.length > 0) {
     for (const file of files.value) {
-      const filePayload = { ...payload, rename: stripTorrentExtension(file.name) }
       const p = torrentStore
-        .addTorrents([file], '', filePayload)
+        .addTorrentAndRenameFolder(file, stripTorrentExtension(file.name), payload)
         .then(() => {
           files.value = files.value.filter(f => f.name !== file.name)
         })
@@ -245,10 +255,19 @@ onBeforeMount(() => {
               </template>
             </v-text-field>
 
-            <v-tooltip :text="$t('dialogs.add.use_filename_warning')" location="bottom" :disabled="files.length <= 1">
+            <v-tooltip
+              :text="hasDuplicateFilenames ? $t('dialogs.add.use_filename_duplicate_warning') : $t('dialogs.add.use_filename_warning')"
+              location="bottom"
+              :disabled="!hasDuplicateFilenames && files.length <= 1">
               <template #activator="{ props: tooltipProps }">
                 <div v-bind="tooltipProps">
-                  <v-checkbox v-model="form.useFilenameAsRename" :label="$t('dialogs.add.use_filename')" color="accent" density="compact" hide-details />
+                  <v-checkbox
+                    v-model="form.useFilenameAsRename"
+                    :label="$t('dialogs.add.use_filename')"
+                    color="accent"
+                    density="compact"
+                    hide-details
+                    :disabled="hasDuplicateFilenames" />
                 </div>
               </template>
             </v-tooltip>
