@@ -7,7 +7,7 @@ import { useTrackerStore } from './trackers'
 import { useSearchQuery, useTorrentBuilder } from '@/composables'
 import { comparatorMap, FilterType, TorrentState, TrackerSpecialFilter } from '@/constants/vuetorrent'
 import qbit from '@/services/qbit'
-import { RawQbitTorrent } from '@/types/qbit/models'
+import { QbitTorrent, RawQbitTorrent } from '@/types/qbit/models'
 import { AddTorrentPayload } from '@/types/qbit/payloads'
 import { Torrent as VtTorrent } from '@/types/vuetorrent'
 
@@ -283,7 +283,7 @@ export const useTorrentStore = defineStore(
 
       // 4. Poll getTorrents() to find the torrent by name
       //    Retry up to ~3 seconds (6 attempts × 500ms)
-      let torrent: RawQbitTorrent | undefined
+      let torrent: QbitTorrent | undefined
       for (let i = 0; i < 6; i++) {
         await new Promise(resolve => setTimeout(resolve, 500))
         const torrents = await qbit.getTorrents()
