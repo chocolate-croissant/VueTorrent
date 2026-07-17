@@ -151,7 +151,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/VueTorrent/vuetorrent-lsio-mod
+          images: ghcr.io/${{ github.repository_owner }}/vuetorrent-lsio-mod
           tags: |
             type=raw,value=nightly
             type=sha
@@ -170,6 +170,7 @@ jobs:
     name: Push to demo repo
     runs-on: ubuntu-latest
     needs: build-release
+    if: github.repository == 'VueTorrent/VueTorrent'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -260,7 +261,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/VueTorrent/vuetorrent-lsio-mod
+          images: ghcr.io/${{ github.repository_owner }}/vuetorrent-lsio-mod
           tags: |
             type=match,pattern=v(.*),group=1,value=${{ needs.setup-release.outputs.tag_name }}
 
