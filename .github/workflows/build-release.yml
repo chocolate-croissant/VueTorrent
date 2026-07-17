@@ -28,7 +28,7 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ github.token }}
 
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -180,7 +180,7 @@ jobs:
         with:
           folder: './vuetorrent-demo'
           repository-name: 'VueTorrent/demo'
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ github.token }}
 
   upload-release:
     name: Upload release to GitHub
