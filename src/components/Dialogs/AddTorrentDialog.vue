@@ -5,7 +5,6 @@ import { toast } from 'vue3-toastify'
 import AddTorrentParamsForm from './AddTorrentParamsForm.vue'
 import HistoryField from '@/components/Core/HistoryField.vue'
 import { useDialog, useI18nUtils } from '@/composables'
-import { ContentLayout } from '@/constants/qbit/AppPreferences'
 import { HistoryKey } from '@/constants/vuetorrent'
 import { useAddTorrentStore, useAppStore, useTorrentStore, useVueTorrentStore } from '@/stores'
 import { AddTorrentPayload } from '@/types/qbit/payloads'
@@ -87,29 +86,13 @@ function submit() {
     useDownloadPath: addTorrentParams.value.use_download_path,
   }
 
-  if (form.value.useFilenameAsRename && files.value.length === 1) {
-    const basename = form.value.rename || stripTorrentExtension(files.value[0].name)
-    const baseSavePath = payload.savepath ? payload.savepath.replace(/[/\\]$/, '') : ''
-    payload.savepath = baseSavePath ? `${baseSavePath}/${basename}` : basename
-    payload.contentLayout = ContentLayout.NO_SUBFOLDER
-    payload.autoTMM = false
-  }
-
   const torrentsCount = files.value.length + urls.value.split('\n').filter(url => url.trim().length).length
 
   const promises: Promise<void>[] = []
 
   if (form.value.useFilenameAsRename && files.value.length > 1) {
     for (const file of files.value) {
-      const basename = stripTorrentExtension(file.name)
-      const baseSavePath = payload.savepath ? payload.savepath.replace(/[/\\]$/, '') : ''
-      const filePayload: AddTorrentPayload = {
-        ...payload,
-        rename: basename,
-        savepath: baseSavePath ? `${baseSavePath}/${basename}` : basename,
-        contentLayout: ContentLayout.NO_SUBFOLDER,
-        autoTMM: false,
-      }
+      const filePayload = { ...payload, rename: stripTorrentExtension(file.name) }
       const p = torrentStore
         .addTorrents([file], '', filePayload)
         .then(() => {
